@@ -16,4 +16,7 @@ public class CommitMessage implements Serializable {
 		this.commitName = commitName;
 		this.date = date;
 		}
+	public String toString() {
+		return String.format("%s - %s", commitName, date.toString());
+	}
 }

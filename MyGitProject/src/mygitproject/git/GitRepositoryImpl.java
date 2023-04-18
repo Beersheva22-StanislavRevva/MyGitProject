@@ -47,20 +47,24 @@ public class GitRepositoryImpl implements GitRepository {
 
 	@Override
 	public String commit(String commitMessage) {
+		
 		if (head == null) {
 			branches.put("master", null);
 			head = "master";
 		}
+		List<FileState> info = info();
+		
+		if(!checkIsUpdated(info)) {
+			return "Commited unsuccesfully - no untracked/modified files found";
+		}
+		
 		String commitName = generateCommitName();
 		String prevCommit = branches.get(head);
 		HashMap<String, FileStorage> files = new HashMap<String, FileStorage>();
 		if (prevCommit != null) {  
-		files = (HashMap<String, FileStorage>) Map.copyOf(commits.get(prevCommit).getFiles());
+				files.putAll(commits.get(prevCommit).getFiles());
 		}
 		boolean isChanged = false;
-		
-		List<FileState> info = info();
-						
 		for (FileState fs : info) {
 			if (fs.getFileStatus().equals(FileStatus.UNTRACKED)) {
 				File file = new File(fs.getFilePath());
@@ -78,11 +82,19 @@ public class GitRepositoryImpl implements GitRepository {
 		if (isChanged) {
 		Commit commit = new Commit (commitName, branches.get(head), files);
 		commits.put(commitName, commit);
-		branches.get(head).replaceAll("*", commitName);
-		return String.format("Commited succesfully. Branch name - %s, commit name - %s", head, commitName); 
-		} else {
-			return "Commited unsuccesfully - no untracked/modified files found";
+		branches.replace(head, commitName);
 		}
+		return String.format("Commited succesfully. Branch name - %s, commit name - %s", head, commitName); 
+	}
+
+	private boolean checkIsUpdated(List<FileState> info) {
+		boolean fl = false;
+		for (FileState fs : info) {
+			if (fs.getFileStatus().equals(FileStatus.UNTRACKED) || fs.getFileStatus().equals(FileStatus.MODIFIED)) {
+				fl = true;
+			}
+		}
+		return fl;
 	}
 
 	private String[] fileToArray(File file) {
@@ -169,7 +181,7 @@ public class GitRepositoryImpl implements GitRepository {
 			}
 		String commitLink = branches.remove(branchName);
 		branches.put(newName, commitLink);
-		if (head == branchName) {
+		if (head.equals(branchName)) {
 			head = newName;
 		}
 		return String.format("Branch %s renamed to % successfully", branchName, newName);	
@@ -177,7 +189,7 @@ public class GitRepositoryImpl implements GitRepository {
 
 	@Override
 	public String deleteBranch(String branchName) {
-		if (head == branchName) {
+		if (branchName.equals(head)) {
 			return "Current branch cannot be deleted";	
 		}
 		branches.remove(branchName);
