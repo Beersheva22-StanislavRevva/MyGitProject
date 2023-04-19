@@ -32,6 +32,7 @@ public class GitControlItems {
 	private void commit(InputOutput io) {
 		String message = io.readString("Enter a commit message:");
 		io.writeLine(git.commit(message));
+		io.readString("\n" + "Press any key");
 	}
 
 	private void info (InputOutput io) {
@@ -39,43 +40,62 @@ public class GitControlItems {
 	for (FileState fs : res) {
 		io.writeLine(fs.toString());
 	}
+	io.readString("\n" + "Press any key");
 	}
 
 	private void createBranch (InputOutput io) {
 		String message = io.readString("Enter the name of new branch:");
 		io.writeLine(git.createBranch(message));
+		io.readString("\n" + "Press any key");
 	}
 
 	private void renameBranch (InputOutput io) {
 		String message1 = io.readString("Enter the name of pressent branch:");
 		String message2 = io.readString("Enter new name of the branch:");
 		io.writeLine(git.renameBranch(message1, message2));
+		io.readString("\n" + "Press any key");
 	}
 
 	private void deleteBranch (InputOutput io) {
 		String message = io.readString("Enter the name of branch to delete:");
 		io.writeLine(git.deleteBranch(message));
+		io.readString("\n" + "Press any key");
 	}
 
 	private void log (InputOutput io) {
 		List<CommitMessage> res = git.log();
-		for (CommitMessage cm : res) {
-			io.writeLine(cm.toString());
+		if (!res.isEmpty()) {
+			for (CommitMessage cm : res) {
+				io.writeLine(cm.toString());
+			}
+		} else {
+			io.writeLine("There is no commit in MyGit");
 		}
+		io.readString("\n" + "Press any key");
 	}
 	
 	private void branches (InputOutput io) {
 		List<String> res = git.branches();
-		for (String s : res) {
-			io.writeLine(s);
+		if (!res.isEmpty()) {
+			for (String s : res) {
+				io.writeLine(s);
+			}
+		} else {
+			io.writeLine("There is no commit in MyGit");
 		}
+		io.readString("\n" + "Press any key");
 	}
 	
 	private void commitContent (InputOutput io) {
 		String message = io.readString("Enter the name of commit:");
 		List<Path> res = git.commitContent(message);
-		for (Path p : res) {
-			io.writeLine(p.toString());
+		if (!res.isEmpty()) {
+			for (Path p : res) {
+				io.writeLine(p.toString());
+			}
+			io.readString("\n" + "Press any key");
+		} else {io.writeLine("No commit with this name was found\n");
+		 commitContent(io);
 		}
 	}
 	
@@ -89,7 +109,7 @@ public class GitControlItems {
 	}
 	
 	private void addIgnoredFileNameExp (InputOutput io) {
-		String message = io.readString("Enter file name expression");
+		String message = io.readString("Enter file name expression:");
 		io.writeLine(git.addIgnoredFileNameExp(message));
 	}
 	

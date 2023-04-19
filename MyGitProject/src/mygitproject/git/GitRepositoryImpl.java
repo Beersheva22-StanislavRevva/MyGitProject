@@ -9,12 +9,15 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 
@@ -52,6 +55,13 @@ public class GitRepositoryImpl implements GitRepository {
 			branches.put("master", null);
 			head = "master";
 		}
+		
+		if (!branches.containsKey(head)) {
+			String headMessage = String.format("commit %s", head);
+			branches.put(String.format(headMessage, head), head);
+			head = headMessage;			
+		}
+		
 		List<FileState> info = info();
 		
 		if(!checkIsUpdated(info)) {
@@ -110,11 +120,11 @@ public class GitRepositoryImpl implements GitRepository {
 
 	private String generateCommitName() {
 		int leftLimit = 48; // number '0'
-	    int rightLimit = 122; // letter 'z'
+	    int rightLimit = 102; // letter 'f'
 	    int targetStringLength = 7;
 	    Random random = new Random();
 	    String randomString = random.ints(leftLimit, rightLimit + 1)
-	    	      .filter(i -> (i <= 57 || i >= 65) && (i <= 90 || i >= 97))
+	    	      .filter(i -> (i <= 57 || i >= 97))
 	    	      .limit(targetStringLength)
 	    	      .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
 	    	      .toString(); // filter deletes special chars
@@ -165,6 +175,7 @@ public class GitRepositoryImpl implements GitRepository {
 		return String.format("Branch %s is already exists", branchName);	
 		} else {
 			branches.put(branchName, null);
+			head = branchName;
 			return String.format("Branch %s created successfully", branchName);	
 		}
 	}
@@ -214,21 +225,27 @@ public class GitRepositoryImpl implements GitRepository {
 
 	@Override
 	public List<String> branches() {
-		List<String> res = new ArrayList<String>();
+		ArrayList<String> res = new ArrayList<String>();
 		if (head == null) {
 			return res;
 		}
-		res = (List<String>) branches.keySet();
-		res.remove(head);
+		Set<String> keySet = branches.keySet();
+		for (String s : keySet) {
+			res.add(s);
+		}
+		res.remove(getHead());
 		res.add("* " + head);
 		return res;
 	}
 
 	@Override
 	public List<Path> commitContent(String commitName) {
-		Commit commit = commits.get(commitName);
 		List<Path> res = new ArrayList<Path> ();
-		List<String> tmp = (List<String>) commit.getFiles().keySet();
+		Commit commit = commits.get(commitName);
+		if (commit == null)	{
+			return res;
+		}
+		Set <String> tmp = commit.getFiles().keySet();
 		for (String s : tmp) {
 			res.add(Path.of(s));
 		}
@@ -237,8 +254,38 @@ public class GitRepositoryImpl implements GitRepository {
 
 	@Override
 	public String switchTo(String name) {
-		// TODO Auto-generated method stub
-		return null;
+		if(checkIsUpdated(info())) {
+			return "Uncommited files were found. Please, make a commit";
+		}
+		Commit commit = commits.get(name);
+		if (commit == null) {
+			return String.format("Couldn't found commit with the name %s ", name);
+		}
+		clearGitFolder();
+		HashMap<String, FileStorage> files = commit.getFiles();
+		
+		for (Entry<String, FileStorage> entry : files.entrySet()) {
+			FileStorage fileStorage = entry.getValue();
+			try {
+				Files.createFile(Path.of(fileStorage.filePath));
+				Files.write(Path.of(fileStorage.filePath), Arrays.asList(fileStorage.file));
+				Files.setLastModifiedTime(Path.of(fileStorage.filePath), FileTime.fromMillis(fileStorage.date));
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		      
+		}
+		head = name;
+		return String.format("MyGit restored to commit %s succesfully",name);
+	}
+
+	private void clearGitFolder() {
+		for (File f : folder.listFiles()) {
+			if (!gitIgnore.contains(f.getName())) {
+				f.delete();
+			}
+		}
+		
 	}
 
 	@Override
@@ -248,8 +295,15 @@ public class GitRepositoryImpl implements GitRepository {
 
 	@Override
 	public void save() {
+		if (!Files.exists(Path.of(GITFILE))) {
+			try {
+				Files.createFile(Path.of(GITFILE));
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 		try {
-			ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(GIT_FILE));
+			ObjectOutputStream output = new ObjectOutputStream(new FileOutputStream(GITFILE));
 			output.writeObject(this);
 		} catch (Exception e) {
 			throw new RuntimeException(e.toString());

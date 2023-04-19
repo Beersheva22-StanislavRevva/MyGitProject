@@ -4,10 +4,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 public interface GitRepository extends Serializable {
-	String GIT_FILE = ".mygit";
 	String commit(String commitMessage);
-	
-	
 	List<FileState> info();
 	String createBranch(String branchName);
 	String renameBranch(String branchName, String newName);
