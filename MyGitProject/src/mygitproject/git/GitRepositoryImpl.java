@@ -26,75 +26,63 @@ public class GitRepositoryImpl implements GitRepository {
 	private static final long serialVersionUID = 1L;
 	private static String FOLDER = "C:\\Users\\revva\\git\\input-output-networking\\input-output-networking\\src\\telran\\mygit\\mygitfolder";
 	private static String GITFILE = "C:\\Users\\revva\\git\\input-output-networking\\input-output-networking\\src\\telran\\mygit\\\\mygitfolder\\.mygit";
-	
-	HashMap<String,Commit> commits = new HashMap<String,Commit>();
-	HashMap<String,String> branches = new HashMap<String,String>();
+
+	HashMap<String, Commit> commits = new HashMap<String, Commit>();
+	HashMap<String, String> branches = new HashMap<String, String>();
 	File folder = new File(FOLDER);
 	String head;
 	List<String> gitIgnore = new ArrayList<String>();
-	
-	
+
 	public static GitRepositoryImpl init() {
 		GitRepositoryImpl git = new GitRepositoryImpl();
 		if (Files.exists(Path.of(GITFILE))) {
 			try {
-				ObjectInputStream input = new ObjectInputStream(new FileInputStream(new File (GITFILE)));
+				ObjectInputStream input = new ObjectInputStream(new FileInputStream(new File(GITFILE)));
 				git = (GitRepositoryImpl) input.readObject();
-				} catch (Exception e) {
-				throw new RuntimeException(); 
-				}
+			} catch (Exception e) {
+				throw new RuntimeException();
+			}
 		}
 		return git;
-				
+
 	}
 
 	@Override
 	public String commit(String commitMessage) {
-		
+
 		if (head == null) {
 			branches.put("master", null);
 			head = "master";
 		}
-		
-		if (!branches.containsKey(head)) {
-			String headMessage = String.format("commit %s", head);
-			branches.put(String.format(headMessage, head), head);
-			head = headMessage;			
-		}
-		
+
 		List<FileState> info = info();
-		
-		if(!checkIsUpdated(info)) {
+
+		if (!checkIsUpdated(info)) {
 			return "Commited unsuccesfully - no untracked/modified files found";
 		}
-		
+
 		String commitName = generateCommitName();
 		String prevCommit = branches.get(head);
 		HashMap<String, FileStorage> files = new HashMap<String, FileStorage>();
-		if (prevCommit != null) {  
-				files.putAll(commits.get(prevCommit).getFiles());
+		if (prevCommit != null) {
+			files.putAll(commits.get(prevCommit).getFiles());
 		}
-		boolean isChanged = false;
 		for (FileState fs : info) {
+			File file = new File(fs.getFilePath());
+			FileStorage fileStorage = new FileStorage(file.getAbsolutePath(), fileToArray(file), file.lastModified());
 			if (fs.getFileStatus().equals(FileStatus.UNTRACKED)) {
-				File file = new File(fs.getFilePath());
-				FileStorage fileStorage = new FileStorage(file.getAbsolutePath(), fileToArray(file), file.lastModified());
 				files.put(file.getAbsolutePath(), fileStorage);
-				isChanged = true;
 			}
 			if (fs.getFileStatus().equals(FileStatus.MODIFIED)) {
-				File file = new File(fs.getFilePath());
-				files.get(file.getAbsolutePath()).setDate(file.lastModified());
-				files.get(file.getAbsolutePath()).setFile(fileToArray(file));
-				isChanged = true;
+				files.replace(file.getAbsolutePath(), fileStorage);
+			
 			}
 		}
-		if (isChanged) {
-		Commit commit = new Commit (commitName, branches.get(head), files);
+		Commit commit = new Commit(commitName, branches.get(head), files);
 		commits.put(commitName, commit);
 		branches.replace(head, commitName);
-		}
-		return String.format("Commited succesfully. Branch name - %s, commit name - %s", head, commitName); 
+		
+		return String.format("Commited succesfully. Branch name - %s, commit name - %s", head, commitName);
 	}
 
 	private boolean checkIsUpdated(List<FileState> info) {
@@ -109,7 +97,7 @@ public class GitRepositoryImpl implements GitRepository {
 
 	private String[] fileToArray(File file) {
 		Path path = Path.of(file.getAbsolutePath());
-		String [] res = null;
+		String[] res = null;
 		try {
 			res = Files.readAllLines(path).toArray(String[]::new);
 		} catch (IOException e) {
@@ -120,33 +108,34 @@ public class GitRepositoryImpl implements GitRepository {
 
 	private String generateCommitName() {
 		int leftLimit = 48; // number '0'
-	    int rightLimit = 102; // letter 'f'
-	    int targetStringLength = 7;
-	    Random random = new Random();
-	    String randomString = random.ints(leftLimit, rightLimit + 1)
-	    	      .filter(i -> (i <= 57 || i >= 97))
-	    	      .limit(targetStringLength)
-	    	      .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
-	    	      .toString(); // filter deletes special chars
+		int rightLimit = 102; // letter 'f'
+		int targetStringLength = 7;
+		Random random = new Random();
+		String randomString = random.ints(leftLimit, rightLimit + 1).filter(i -> (i <= 57 || i >= 97))
+				.limit(targetStringLength)
+				.collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString(); // filter
+																												// deletes
+																												// special
+																												// chars
 		return randomString;
 	}
 
 	@Override
 	public List<FileState> info() {
 		List<FileState> info = new ArrayList<FileState>();
-		
+
 		Commit commit = commits.get(branches.get(head));
 		for (File f : folder.listFiles()) {
 			if (checkFileProperties(f)) {
-				FileStatus fileStatus = getFileStatus(f, commit); 
-				info.add(new FileState (f.getAbsolutePath(),fileStatus));
+				FileStatus fileStatus = getFileStatus(f, commit);
+				info.add(new FileState(f.getAbsolutePath(), fileStatus));
 			}
 		}
 		return info;
 	}
 
 	private boolean checkFileProperties(File f) {
-		
+
 		return f.isFile() && !gitIgnore.contains(f.getName());
 	}
 
@@ -164,44 +153,41 @@ public class GitRepositoryImpl implements GitRepository {
 		}
 		return fileStatus;
 	}
-	
 
 	@Override
 	public String createBranch(String branchName) {
 		if (head == null) {
-		return "Unable to create branch without commit";
-		} 
+			return "Unable to create branch without commit";
+		}
 		if (branches.containsKey(branchName)) {
-		return String.format("Branch %s is already exists", branchName);	
+			return String.format("Branch %s is already exists", branchName);
 		} else {
 			branches.put(branchName, null);
 			head = branchName;
-			return String.format("Branch %s created successfully", branchName);	
+			return String.format("Branch %s created successfully", branchName);
 		}
 	}
-	
-	
 
 	@Override
 	public String renameBranch(String branchName, String newName) {
 		if (head == null) {
 			return "There is no branch in git";
-			}
+		}
 		if (!branches.containsKey(branchName)) {
-			return String.format("No branch with name %s was found", branchName) ;
-			}
+			return String.format("No branch with name %s was found", branchName);
+		}
 		String commitLink = branches.remove(branchName);
 		branches.put(newName, commitLink);
 		if (head.equals(branchName)) {
 			head = newName;
 		}
-		return String.format("Branch %s renamed to % successfully", branchName, newName);	
+		return String.format("Branch %s renamed to % successfully", branchName, newName);
 	}
 
 	@Override
 	public String deleteBranch(String branchName) {
 		if (branchName.equals(head)) {
-			return "Current branch cannot be deleted";	
+			return "Current branch cannot be deleted";
 		}
 		branches.remove(branchName);
 		return String.format("Branch %s deleted successfully", branchName);
@@ -209,17 +195,17 @@ public class GitRepositoryImpl implements GitRepository {
 
 	@Override
 	public List<CommitMessage> log() {
-		List<CommitMessage> res = new ArrayList<CommitMessage>();  
+		List<CommitMessage> res = new ArrayList<CommitMessage>();
 		if (head == null) {
 			return res;
 		}
 		String commitName = branches.get(head);
-		
-		while(commitName != null) {
+
+		while (commitName != null) {
 			CommitMessage commitMessage = new CommitMessage(commitName, commits.get(commitName).getDate());
 			res.add(commitMessage);
 			commitName = commits.get(commitName).getPrevCommit();
-		}	
+		}
 		return res;
 	}
 
@@ -240,12 +226,12 @@ public class GitRepositoryImpl implements GitRepository {
 
 	@Override
 	public List<Path> commitContent(String commitName) {
-		List<Path> res = new ArrayList<Path> ();
+		List<Path> res = new ArrayList<Path>();
 		Commit commit = commits.get(commitName);
-		if (commit == null)	{
+		if (commit == null) {
 			return res;
 		}
-		Set <String> tmp = commit.getFiles().keySet();
+		Set<String> tmp = commit.getFiles().keySet();
 		for (String s : tmp) {
 			res.add(Path.of(s));
 		}
@@ -254,16 +240,19 @@ public class GitRepositoryImpl implements GitRepository {
 
 	@Override
 	public String switchTo(String name) {
-		if(checkIsUpdated(info())) {
+		if (checkIsUpdated(info())) {
 			return "Uncommited files were found. Please, make a commit";
 		}
 		Commit commit = commits.get(name);
 		if (commit == null) {
 			return String.format("Couldn't found commit with the name %s ", name);
 		}
+		if (!CheckBranch(name)) {
+			return String.format("Can't switch to commit %s, it is on another branch", name);
+		}
 		clearGitFolder();
 		HashMap<String, FileStorage> files = commit.getFiles();
-		
+
 		for (Entry<String, FileStorage> entry : files.entrySet()) {
 			FileStorage fileStorage = entry.getValue();
 			try {
@@ -273,24 +262,38 @@ public class GitRepositoryImpl implements GitRepository {
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			}
-		      
+
 		}
-		head = name;
-		return String.format("MyGit restored to commit %s succesfully",name);
+		branches.replace(head, name);
+		return String.format("MyGit restored to commit %s succesfully", name);
+	}
+
+	private boolean CheckBranch(String name) {
+		List<CommitMessage> log = log();
+		boolean res = false;
+		int i = 0;
+		while (!res && i < log.size()) {
+			if (log.get(i).commitName.equals(name)) {
+				res = true;
+			}
+			i++;
+		}
+		return res;
 	}
 
 	private void clearGitFolder() {
 		for (File f : folder.listFiles()) {
-			if (!gitIgnore.contains(f.getName())) {
+			String fileName = f.getName();
+			if (!gitIgnore.contains(fileName)) {
 				f.delete();
 			}
 		}
-		
+
 	}
 
 	@Override
 	public String getHead() {
-		return branches.containsKey(head) ?  head : null;
+		return branches.containsKey(head) ? head : null;
 	}
 
 	@Override
@@ -308,7 +311,7 @@ public class GitRepositoryImpl implements GitRepository {
 		} catch (Exception e) {
 			throw new RuntimeException(e.toString());
 		}
-		
+
 	}
 
 	@Override
